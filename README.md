@@ -26,7 +26,7 @@ docker run \
     --env GOOSE_MODEL \
     --env GOOSE_MODE \
     --env GOOGLE_API_KEY \
-    --volume $(pwd):/workspace \
+    --volume "$(pwd):/workspace" \
     andreswebs/goose-cli run \
         --with-builtin developer \
         --text "are you operational?"

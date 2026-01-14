@@ -58,6 +58,15 @@ RUN chown --recursive "${APP_USER}:${APP_USER}" /workspace
 
 USER "${APP_USER}"
 
+ENV HOME="/home/${APP_USER}"
+ENV PATH="${HOME}/.local/bin:${PATH}"
+ENV EDITOR="vim"
+ENV DO_NOT_TRACK="true"
+ENV GOOSE_HOME="${HOME}"
+ENV GOOSE_DISABLE_KEYRING="1"
+
+RUN echo 'export PS1="\e[34m\u@\h\e[35m \w\e[0m\n$ "' >> "${HOME}/.bashrc"
+
 RUN <<EOT
     set -o errexit -o pipefail && \
     curl \
@@ -68,11 +77,5 @@ RUN <<EOT
         "https://github.com/block/goose/releases/download/stable/download_cli.sh" | \
     CONFIGURE=false bash
 EOT
-
-ENV HOME="/home/${APP_USER}"
-ENV PATH="${HOME}/.local/bin:${PATH}"
-ENV GOOSE_HOME="${HOME}"
-ENV EDITOR="vim"
-ENV GOOSE_DISABLE_KEYRING="1"
 
 ENTRYPOINT ["goose"]
