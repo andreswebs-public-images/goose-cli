@@ -2,10 +2,16 @@
 FROM docker.io/debian:trixie
 
 ARG DEBIAN_FRONTEND="noninteractive"
+ARG DEBCONF_NONINTERACTIVE_SEEN="true"
+
+COPY --from=mikefarah/yq /usr/bin/yq /usr/local/bin/
+COPY --from=denoland/deno:bin-2.6.4 /deno /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bunx /usr/local/bin/
 
 RUN <<EOT
-    set -o errexit && \
-    apt-get update && \
+    set -o errexit
+    apt-get update
     apt-get install --yes --no-install-recommends \
         bc \
         bzip2 \
@@ -16,26 +22,23 @@ RUN <<EOT
         git \
         jq \
         less \
-        libxcb1 \
         lsof \
         man-db \
+        netcat-openbsd \
+        openssh-client \
         procps \
         psmisc \
         ripgrep \
         rsync \
         socat \
+        sudo \
         tree \
         unzip \
         vim \
-        zip && \
-    apt-get clean && \
+        zip
+    apt-get clean
     rm -rf /var/lib/apt/lists/*
 EOT
-
-COPY --from=mikefarah/yq /usr/bin/yq /usr/local/bin/
-COPY --from=denoland/deno:bin-2.6.4 /deno /usr/local/bin/
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
-COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/
 
 ARG APP_UID="2000"
 ARG APP_GID="2000"
@@ -52,20 +55,45 @@ RUN \
       --create-home \
       "${APP_USER}"
 
-WORKDIR /workspace
+RUN \
+    mkdir --parents /etc/sudoers.d/ && \
+    echo "${APP_USER} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${APP_USER}" && \
+    chmod 0440 "/etc/sudoers.d/${APP_USER}"
 
+WORKDIR /workspace
 RUN chown --recursive "${APP_USER}:${APP_USER}" /workspace
 
 USER "${APP_USER}"
 
 ENV HOME="/home/${APP_USER}"
-ENV PATH="${HOME}/.local/bin:${PATH}"
+ENV PATH="${HOME}/.local/bin:${HOME}/.bun/bin:${PATH}"
 ENV EDITOR="vim"
 ENV DO_NOT_TRACK="true"
 ENV GOOSE_HOME="${HOME}"
 ENV GOOSE_DISABLE_KEYRING="1"
 
+RUN mkdir --parents "${HOME}/.local/share"
+RUN mkdir --parents "${HOME}/.local/bin"
+RUN ln --symbolic $(which bun) "${HOME}/.local/bin/node"
 RUN echo 'export PS1="\e[34m\u@\h\e[35m \w\e[0m\n$ "' >> "${HOME}/.bashrc"
+
+RUN bun install --global @dbml/cli
+RUN bun install --global @sourcemeta/jsonschema
+
+RUN <<EOT
+    set -o errexit -o pipefail
+    git clone https://github.com/wedow/ticket.git "${HOME}/.local/share/ticket"
+    cd "${HOME}/.local/share/ticket" || exit 1
+    ln --symbolic "$(pwd)/ticket" "${HOME}/.local/bin/tk"
+EOT
+
+RUN <<EOT
+    {
+        echo ":set number"
+        echo ":set et"
+        echo ":set sw=2 ts=2 sts=2"
+    } > "${HOME}/.vimrc"
+EOT
 
 RUN <<EOT
     set -o errexit -o pipefail && \
